@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>阿森的专属留影馆</title>
+    <style>
+        :root {
+            --bg-dark: #05100a; 
+            --theme-green: #64d89a; 
+            --theme-light: #a8f0c6; 
+            --text-main: #e8f5ec;
+            --page-bg: #0a1611;
+        }
+
+        /* 去广告 */
+        #netlify-badge, [id*="netlify"], [class*="netlify"], iframe[title*="Netlify"], a[href*="netlify.com"], [data-netlify] { 
+            display: none !important; opacity: 0 !important; pointer-events: none !important; 
+            height: 0 !important; width: 0 !important; z-index: -9999 !important; visibility: hidden !important;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0; padding: 0; background-color: var(--bg-dark); color: var(--text-main);
+            font-family: "Noto Serif SC", "Songti SC", "STSong", serif;
+            overflow: hidden; height: 100vh; height: 100dvh;
+            background-image: radial-gradient(circle at 50% 50%, rgba(20, 60, 40, 0.6) 0%, var(--bg-dark) 70%);
+            -webkit-user-select: none; user-select: none; 
+            touch-action: none;
+        }
+
+        /* 特效 */
+        #falling-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1; overflow: hidden; }
+        .firefly { position: absolute; top: -10vh; background: var(--theme-light); border-radius: 50%; box-shadow: 0 0 10px 2px var(--theme-green); animation: fall linear infinite; }
+        @keyframes fall { 0% { transform: translateY(0) translateX(0) scale(1); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(120vh) translateX(30px) scale(0.5); opacity: 0; } }
+
+        .click-ripple { position: absolute; width: 10px; height: 10px; background: transparent; border: 2px solid var(--theme-light); border-radius: 50%; pointer-events: none; z-index: 9999; transform: translate(-50%, -50%); animation: rippleEffect 0.8s ease-out forwards; box-shadow: 0 0 10px var(--theme-green); }
+        @keyframes rippleEffect { 0% { width: 10px; height: 10px; opacity: 1; border-width: 3px; } 100% { width: 100px; height: 100px; opacity: 0; border-width: 1px; } }
+
+        /* 开门 */
+        #intro-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: #030805; z-index: 10000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            transition: opacity 1.5s ease, visibility 1.5s; perspective: 1000px;
+        }
+        #intro-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+        .door-glow-outside { position: absolute; width: 320px; height: 500px; background: radial-gradient(ellipse, rgba(100, 216, 154, 0.2) 0%, transparent 70%); filter: blur(20px); animation: pulseGlow 3s infinite alternate; }
+        @keyframes pulseGlow { 0% { transform: scale(0.9); opacity: 0.5; } 100% { transform: scale(1.1); opacity: 1; } }
+        .door-wrapper { position: relative; width: 240px; height: 400px; cursor: pointer; perspective: 1000px; }
+        .door-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 120px 120px 0 0; border: 8px solid #1a2e24; box-sizing: border-box; box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 0 15px rgba(100,216,154,0.4); overflow: hidden; background: #0a1611; }
+        .door-light { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, #fff, var(--theme-light), var(--theme-green)); opacity: 0; transition: opacity 1s ease; }
+        .door-leaf { position: absolute; top: 0; width: 50%; height: 100%; background: linear-gradient(135deg, #10241a, #06120c); border: 2px solid #1f3d2d; box-sizing: border-box; transition: transform 1.5s cubic-bezier(0.25, 1, 0.5, 1); box-shadow: inset 0 0 30px rgba(0,0,0,0.9); z-index: 2; display: flex; align-items: center; }
+        .door-leaf.left { left: 0; border-radius: 120px 0 0 0; transform-origin: left center; border-right: 1px solid rgba(100,216,154,0.3); }
+        .door-leaf.right { right: 0; border-radius: 0 120px 0 0; transform-origin: right center; border-left: 1px solid rgba(100,216,154,0.3); }
+        .door-handle { position: absolute; top: 55%; width: 10px; height: 10px; background: var(--theme-light); border-radius: 50%; box-shadow: 0 0 15px var(--theme-light); }
+        .door-leaf.left .door-handle { right: 10px; }
+        .door-leaf.right .door-handle { left: 10px; }
+        .door-tip { position: absolute; bottom: -60px; left: 50%; transform: translateX(-50%); color: rgba(168, 240, 198, 0.6); font-size: 0.9rem; letter-spacing: 3px; animation: fadeInOut 2s infinite alternate; }
+        @keyframes fadeInOut { 0% { opacity: 0.3; } 100% { opacity: 1; text-shadow: 0 0 10px #64d89a; } }
+        
+        #intro-screen.open .door-leaf.left { transform: rotateY(-105deg); }
+        #intro-screen.open .door-leaf.right { transform: rotateY(105deg); }
+        #intro-screen.open .door-light { opacity: 1; }
+        #intro-screen.open .door-tip { opacity: 0; }
+        #intro-screen.open .door-wrapper { transform: scale(1.2); transition: transform 1.5s ease; }
+
+        /* 主页 */
+        #main-content { opacity: 0; transition: opacity 1s ease; display: flex; flex-direction: column; height: 100%; position: relative; z-index: 10; }
+        #main-content.show { opacity: 1; }
+
+        header { text-align: center; padding: 20px 20px 10px; flex-shrink: 0; pointer-events: none; }
+        header h1 { margin: 0; font-size: 1.6rem; letter-spacing: 3px; color: var(--theme-green); }
+
+        #book-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 15px; overflow: hidden; perspective: 1500px; }
+        
+        #book-cover {
+            width: 100%; max-width: 400px; height: 62vh; max-height: 550px;
+            background: var(--page-bg); border-radius: 10px; position: relative;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.9), inset 0 0 20px rgba(0,0,0,0.8);
+            border: 1px solid rgba(100, 216, 154, 0.3);
+            overflow: hidden;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            touch-action: pan-y; 
+        }
+        
+        #book-cover::before {
+            content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 24px; transform: translateX(-50%);
+            background: linear-gradient(to right, transparent, rgba(0,0,0,0.5), transparent);
+            pointer-events: none; z-index: 5;
+        }
+
+        #page-content {
+            width: 100%; height: 100%; padding: 15px;
+            display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 12px;
+            transition: opacity 0.3s;
+        }
+        #page-content.single-row { grid-template-rows: 1fr; align-content: center; }
+        #page-content.single-row .card-item { height: 80%; align-self: center; }
+
+        /* 卡片质感升级：彻底消灭黑边 */
+        .card-item {
+            position: relative; width: 100%; height: 100%; 
+            border-radius: 6px; 
+            background: #05100a; 
+            border: 1px solid rgba(100, 216, 154, 0.3);
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 2px 8px rgba(0,0,0,0.5);
+            overflow: hidden; display: flex; justify-content: center; align-items: center;
+            cursor: pointer;
+        }
+        
+        /* 拍立得内边框 */
+        .card-item::after {
+            content: ''; position: absolute; top: 4px; left: 4px; right: 4px; bottom: 4px;
+            border: 1px solid rgba(168, 240, 198, 0.15);
+            border-radius: 4px; pointer-events: none; z-index: 3;
+        }
+
+        /* 底层：绝对铺满的模糊背景（防黑边核心） */
+        .card-item .bg-img { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            object-fit: cover; filter: blur(10px) brightness(0.6) saturate(1.2); 
+            transform: scale(1.2); z-index: 1; pointer-events: none; 
+        }
+        /* 顶层：完整显示的清晰原图 */
+        .card-item .main-img { 
+            position: relative; width: 100%; height: 100%; 
+            object-fit: contain; z-index: 2; pointer-events: auto; padding: 2px; 
+        }
+
+        .card-text-box {
+            width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;
+            padding: 10px; background: rgba(20,45,30,0.8);
+            font-size: 0.8rem; color: var(--theme-light); line-height: 1.6; text-align: center;
+            border-left: 2px solid var(--theme-green); z-index: 2;
+        }
+
+        #swipe-hint { display: flex; align-items: center; justify-content: center; gap: 15px; padding: 20px 0 30px; flex-shrink: 0; color: rgba(100, 216, 154, 0.6); font-size: 0.9rem; letter-spacing: 2px; }
+
+        /* 3D 弹窗 */
+        #card-modal {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(3, 8, 5, 0.95); display: none; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 20000; perspective: 1000px; touch-action: none;
+        }
+        #card-modal.active { display: flex; }
+
+        #touka-card {
+            width: 85vw; max-width: 350px; height: 70vh;
+            position: relative; transform-style: preserve-3d;
+            border-radius: 15px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(100,216,154,0.3);
+            border: 2px solid rgba(168, 240, 198, 0.6);
+            background: rgba(10, 20, 15, 0.9);
+            touch-action: none; overflow: hidden; display: flex; justify-content: center; align-items: center;
+        }
+        
+        #touka-card .bg-img { position: absolute; top:0; left:0; width: 100%; height: 100%; object-fit: cover; filter: blur(15px) brightness(0.4); transform: scale(1.1); z-index: 1; }
+        #touka-card .main-img { position: relative; width: 100%; height: 100%; object-fit: contain; z-index: 2; }
+        
+        .modal-tip { margin-top: 30px; color: var(--theme-light); font-size: 0.9rem; pointer-events: none;}
+
+        /* 音乐 */
+        #music-player { position: fixed; bottom: 20px; right: 20px; z-index: 1000; }
+        #mermaid-btn { width: 50px; height: 50px; border-radius: 50%; background: rgba(10, 20, 15, 0.8); border: 1.5px solid var(--theme-green); display: flex; justify-content: center; align-items: center; }
+        #mermaid-btn svg { width: 28px; height: 28px; fill: var(--theme-light); }
+    </style>
+</head>
+<body>
+
+    <div id="falling-container"></div>
+
+    <div id="intro-screen">
+        <div class="door-glow-outside"></div>
+        <div class="door-wrapper" id="door-trigger">
+            <div class="door-frame">
+                <div class="door-light"></div>
+                <div class="door-leaf left"><div class="door-handle"></div></div>
+                <div class="door-leaf right"><div class="door-handle"></div></div>
+            </div>
+            <div class="door-tip">轻触推门</div>
+        </div>
+    </div>
+
+    <div id="main-content">
+        <header><h1>阿森的专属留影馆</h1></header>
+        
+        <div id="book-stage">
+            <div id="book-cover">
+                <div id="page-content"></div>
+            </div>
+        </div>
+        
+        <div id="swipe-hint">
+            <span>‹</span>
+            <span id="page-indicator">1 / 8</span>
+            <span>›</span>
+        </div>
+    </div>
+
+    <div id="card-modal">
+        <div id="touka-card">
+            <img id="touka-bg" class="bg-img" src="" alt="">
+            <img id="touka-img" class="main-img" src="" alt="透卡">
+        </div>
+        <div class="modal-tip">手指滑动 · 360°翻转</div>
+    </div>
+
+    <div id="music-player">
+        <div id="mermaid-btn">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15.5c-2.5 0-4.5-2-4.5-4.5s2-4.5 4.5-4.5c1.5 0 2.8.7 3.6 1.8l-2 1.1c-.3-.4-.9-.7-1.6-.7-1.5 0-2.8 1.3-2.8 2.8s1.3 2.8 2.8 2.8c.7 0 1.3-.3 1.6-.7l2 1.1c-.8 1.1-2.1 1.8-3.6 1.8zm5.7-2.3l1.3-1.2-1.3-1.2v2.4z"/>
+                <path d="M17.5 14.5c.8 1.2.8 2.5 0 3.5l1.5 1.5c1.5-1.8 1.5-4.7 0-6.5l-1.5 1.5z"/>
+            </svg>
+        </div>
+    </div>
+
+    <audio id="bgm"></audio>
+
+    <script>
+        // 去广告
+        setInterval(() => {
+            const ads = document.querySelectorAll('a[href*="netlify.com"], [id*="netlify"], [class*="netlify"]');
+            ads.forEach(el => el.remove());
+        }, 500);
+
+        // 特效
+        const fallingContainer = document.getElementById('falling-container');
+        for(let i = 0; i < 40; i++) {
+            let firefly = document.createElement('div');
+            firefly.className = 'firefly';
+            let size = Math.random() * 3 + 2; 
+            firefly.style.width = size + 'px'; firefly.style.height = size + 'px';
+            firefly.style.left = (Math.random() * 100) + 'vw';
+            let duration = Math.random() * 7 + 8;
+            firefly.style.animationDuration = duration + 's';
+            firefly.style.animationDelay = '-' + (Math.random() * duration) + 's';
+            firefly.style.opacity = Math.random() * 0.5 + 0.3;
+            fallingContainer.appendChild(firefly);
+        }
+
+        document.body.addEventListener('click', function(e) {
+            if(e.target.tagName === 'BUTTON' || e.target.closest('#swipe-hint') || e.target.closest('#book-cover')) return;
+            let ripple = document.createElement('div');
+            ripple.className = 'click-ripple';
+            ripple.style.left = e.pageX + 'px'; ripple.style.top = e.pageY + 'px';
+            document.body.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 800);
+        });
+
+        // 开门
+        const introScreen = document.getElementById('intro-screen');
+        const mainContent = document.getElementById('main-content');
+        document.getElementById('door-trigger').onclick = function() {
+            introScreen.classList.add('open');
+            setTimeout(() => mainContent.classList.add('show'), 800);
+            setTimeout(() => introScreen.classList.add('hidden'), 1500);
+        };
+
+        // 🔥 第一页的四张图：拿剑、面具、高脚杯、小黄鸭（按你要求的顺序排列）
+        const imgUrls = [
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebf60afbb.webp", // 拿剑（第一页-左1）
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebf7b2f0e.webp", // 面具男（第一页-右1，替换）
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebf7b7c04.webp", // 高脚杯（第一页-左2，替换）
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5fe7710834.webp", // 小黄鸭（第一页-右2）
+            
+            // 后面的图保持原样
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5fe765eca3.webp", // 星盘横图
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebf49fe1c.webp",
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebf35797e.webp",
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebf23a72a.webp",
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebf183c4e.webp",
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebf05ef34.webp",
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebef1e761.webp",
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebeead18a.webp",
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebed83c5c.webp",
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebebbd91f.webp",
+            "https://picui.ogmua.cn/s1/2026/10/19/6ad5ebeb66a48.webp"
+        ];
+
+        const texts = [
+            "只要你在，我就能画出最美的海。","利莫里亚没有冬天，但你的眼神比火焰更温暖。",
+            "潮汐退去，我在沙滩上画下你的名字。","不要试图逃离我，也不要试图逃离这片海。",
+            "我的画里什么都缺，唯独不缺你。","深海很冷，但你的体温刚刚好。",
+            "漫长的岁月里，我只想做你唯一的信徒。","你看，星星落进海里了，就像我看向你。",
+            "为你燃尽这片海，又有何妨？","别怕，我会一直在你身边。",
+            "哪怕世界毁灭，我也只为你一人作画。","你是我在这漫长岁月中，唯一的救赎。",
+            "闭上眼，听见利莫里亚的海浪声了吗？","我是你的，永远都是。","哪怕只是一场幻梦，我也愿与你沉沦。"
+        ];
+
+        const allData = [];
+        for(let i=0; i<15; i++) allData.push({ type: 'img', src: imgUrls[i] });
+        for(let i=0; i<15; i++) allData.push({ type: 'text', content: texts[i] });
+
+        const pageContent = document.getElementById('page-content');
+        const pageIndicator = document.getElementById('page-indicator');
+        const bookCover = document.getElementById('book-cover');
+        
+        let currentPage = 0;
+        const totalPages = 8; 
+
+        function renderPage(pageIndex) {
+            pageContent.innerHTML = '';
+            let pageData = allData.slice(pageIndex * 4, pageIndex * 4 + 4);
+
+            if (pageData.length === 2) pageContent.classList.add('single-row');
+            else pageContent.classList.remove('single-row');
+
+            pageData.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card-item';
+                
+                if (item.type === 'img') {
+                    const bgImg = document.createElement('img');
+                    bgImg.className = 'bg-img';
+                    bgImg.src = item.src;
+                    
+                    const mainImg = document.createElement('img');
+                    mainImg.className = 'main-img';
+                    mainImg.src = item.src;
+                    mainImg.onclick = function() { open3DModal(item.src); };
+
+                    card.appendChild(bgImg);
+                    card.appendChild(mainImg);
+                } else {
+                    const textBox = document.createElement('div');
+                    textBox.className = 'card-text-box';
+                    textBox.innerHTML = `“${item.content}”`;
+                    card.appendChild(textBox);
+                }
+                pageContent.appendChild(card);
+            });
+
+            pageIndicator.textContent = `${pageIndex + 1} / ${totalPages}`;
+        }
+        renderPage(0);
+
+        // 手动翻书引擎
+        let startX = 0;
+        let currentX = 0;
+        let isSwiping = false;
+        const swipeThreshold = 60;
+
+        bookCover.addEventListener('touchstart', function(e) {
+            startX = e.touches[0].clientX;
+            isSwiping = true;
+            bookCover.style.transition = 'none'; 
+        }, { passive: false });
+
+        bookCover.addEventListener('touchmove', function(e) {
+            if (!isSwiping) return;
+            currentX = e.touches[0].clientX;
+            let diffX = currentX - startX;
+            
+            if ((currentPage === 0 && diffX > 0) || (currentPage === totalPages - 1 && diffX < 0)) {
+                diffX = diffX * 0.2; 
+            }
+
+            let rotateY = (diffX / window.innerWidth) * 45;
+            bookCover.style.transform = `translateX(${diffX}px) rotateY(${rotateY}deg) scale(0.98)`;
+        }, { passive: false });
+
+        bookCover.addEventListener('touchend', function(e) {
+            if (!isSwiping) return;
+            isSwiping = false;
+            
+            let diffX = currentX - startX;
+            
+            bookCover.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            
+            if (diffX < -swipeThreshold && currentPage < totalPages - 1) {
+                bookCover.style.transform = `translateX(-100%) rotateY(-45deg) scale(0.9)`;
+                bookCover.style.opacity = 0;
+                setTimeout(() => {
+                    currentPage++;
+                    renderPage(currentPage);
+                    bookCover.style.transition = 'none';
+                    bookCover.style.transform = `translateX(100%) rotateY(45deg) scale(0.9)`;
+                    setTimeout(() => {
+                        bookCover.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                        bookCover.style.transform = `translateX(0) rotateY(0) scale(1)`;
+                        bookCover.style.opacity = 1;
+                    }, 50);
+                }, 300);
+            } else if (diffX > swipeThreshold && currentPage > 0) {
+                bookCover.style.transform = `translateX(100%) rotateY(45deg) scale(0.9)`;
+                bookCover.style.opacity = 0;
+                setTimeout(() => {
+                    currentPage--;
+                    renderPage(currentPage);
+                    bookCover.style.transition = 'none';
+                    bookCover.style.transform = `translateX(-100%) rotateY(-45deg) scale(0.9)`;
+                    setTimeout(() => {
+                        bookCover.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                        bookCover.style.transform = `translateX(0) rotateY(0) scale(1)`;
+                        bookCover.style.opacity = 1;
+                    }, 50);
+                }, 300);
+            } else {
+                bookCover.style.transform = `translateX(0) rotateY(0) scale(1)`;
+                bookCover.style.opacity = 1;
+            }
+        });
+
+        // 3D 旋转
+        const cardModal = document.getElementById('card-modal');
+        const toukaCard = document.getElementById('touka-card');
+        const toukaImg = document.getElementById('touka-img');
+        const toukaBg = document.getElementById('touka-bg');
+        
+        let isDragging = false, prevX = 0, prevY = 0, rotX = 0, rotY = 0;
+
+        function open3DModal(src) {
+            toukaImg.src = src;
+            toukaBg.src = src;
+            cardModal.classList.add('active');
+            rotX = 0; rotY = 0;
+            toukaCard.style.transform = `rotateX(0deg) rotateY(0deg)`;
+        }
+
+        cardModal.onclick = function(e) {
+            if (e.target === cardModal) cardModal.classList.remove('active');
+        };
+
+        toukaCard.addEventListener('touchstart', function(e) {
+            isDragging = true;
+            prevX = e.touches[0].clientX;
+            prevY = e.touches[0].clientY;
+            toukaCard.style.transition = 'none';
+            e.preventDefault(); 
+        }, { passive: false });
+
+        toukaCard.addEventListener('touchmove', function(e) {
+            if (!isDragging) return;
+            let curX = e.touches[0].clientX;
+            let curY = e.touches[0].clientY;
+            
+            let deltaX = curX - prevX;
+            let deltaY = curY - prevY;
+
+            rotY += deltaX * 0.6;
+            rotX -= deltaY * 0.6;
+
+            toukaCard.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+            
+            prevX = curX;
+            prevY = curY;
+            e.preventDefault(); 
+        }, { passive: false });
+
+        toukaCard.addEventListener('touchend', function() {
+            isDragging = false;
+        });
+
+        // 音乐
+        const mermaidBtn = document.getElementById('mermaid-btn');
+        const bgm = document.getElementById('bgm');
+        const playlist = [
+            "https://pdftourl.net/audio/1792403885744-26cdc375-cf76-4918-b350-86dc790bf189.m4a",
+            "https://pdftourl.net/audio/1792403959577-903eb46c-c12d-4812-ab6e-5d41d8db296d.m4a"
+        ];
+        let currentTrack = 0, isPlaying = false;
+
+        mermaidBtn.onclick = function() {
+            if (!bgm.src) bgm.src = playlist[0];
+            if (isPlaying) bgm.pause(); else bgm.play();
+            isPlaying = !isPlaying;
+        };
+
+        bgm.onended = function() {
+            currentTrack = (currentTrack + 1) % playlist.length;
+            bgm.src = playlist[currentTrack];
+            bgm.play();
+        };
+    </script>
+</body>
+</html>
